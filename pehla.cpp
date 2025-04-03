@@ -9,16 +9,21 @@ private:
     int accountNumber;
     std::string customerName;
     double balance;
+    int pin;
 
 public:
     // Constructor
-    BankAccount(int accNo, std::string name, double initialBalance)
-        : accountNumber(accNo), customerName(name), balance(initialBalance) {}
+    BankAccount(int accNo, std::string name, double initialBalance, int pinCode)
+        : accountNumber(accNo), customerName(name), balance(initialBalance), pin(pinCode) {}
 
     // Getters
     int getAccountNumber() const { return accountNumber; }
     std::string getCustomerName() const { return customerName; }
     double getBalance() const { return balance; }
+
+    bool verifyPin(int enteredPin) const{
+        return enteredPin == pin;
+    }
 
     // Deposit function
     void deposit(double amount) {
@@ -31,7 +36,12 @@ public:
     }
 
     // Withdraw function
-    bool withdraw(double amount) {
+    bool withdraw(double amount, int enteredPin) {
+        if(!verifyPin(enteredPin))
+        {
+            std::cout<<"Incorrect PIN!  Transaction denied.\n";
+            return false;
+        }
         if (amount > 0 && amount <= balance) {
             balance -= amount;
             std::cout << "Withdrawal successful!\n";
@@ -48,6 +58,8 @@ public:
         std::cout << "Customer Name: " << customerName << "\n";
         std::cout << "Balance: $" << std::fixed << std::setprecision(2) << balance << "\n";
     }
+
+    int getPin() const { return pin; }
 };
 
 
@@ -63,6 +75,7 @@ public:
     void createAccount() {
         std::string name;
         double initialDeposit;
+        int pin;
 
         std::cout << "Enter Customer Name: ";
         std::cin.ignore(); // To ignore leftover newline character
@@ -70,8 +83,17 @@ public:
         std::cout << "Enter Initial Deposit: ";
         std::cin >> initialDeposit;
 
+        // Set a 4 - digit pin
+        do {
+            std::cout << "Set a 4-digit PIN: ";
+            std::cin >> pin;
+            if (pin < 1000 || pin > 9999) {
+                std::cout << "Invalid PIN! Please enter a 4-digit number.\n";
+            }
+        } while (pin < 1000 || pin > 9999);
+
         // Create a new account with a unique account number
-        BankAccount newAccount(nextAccountNumber, name, initialDeposit);
+        BankAccount newAccount(nextAccountNumber, name, initialDeposit, pin);
         nextAccountNumber++;  // Increment the account number for the next account
 
         accounts.push_back(newAccount);
@@ -104,7 +126,11 @@ public:
     void withdrawFromAccount(int accountNumber, double amount) {
         BankAccount* account = searchAccount(accountNumber);
         if (account) {
-            account->withdraw(amount);
+            int enteredPin;
+            std::cout<<"Enter PIN: ";
+            std::cin>>enteredPin;
+
+            account->withdraw(amount, enteredPin);
         } else {
             std::cout << "Account not found!\n";
         }
@@ -116,9 +142,17 @@ public:
         BankAccount* toAcc = searchAccount(toAccount);
 
         if (fromAcc && toAcc) {
-            if (fromAcc->withdraw(amount)) {
-                toAcc->deposit(amount);
-                std::cout << "Transfer successful!\n";
+            int enteredPin;
+            std::cout << "Enter PIN for Account " << fromAccount << ": ";
+            std::cin >> enteredPin;
+            if(fromAcc->verifyPin(enteredPin)){
+                if (fromAcc->withdraw(amount, enteredPin)) {
+                    toAcc->deposit(amount);
+                    std::cout << "Transfer successful!\n";
+                }
+            }
+            else{
+                std::cout << "Incorrect PIN! Transfer denied.\n";
             }
         } else {
             std::cout << "One or both accounts not found!\n";
@@ -144,7 +178,8 @@ public:
             for (const auto& account : accounts) {
                 outFile << account.getAccountNumber() << " "
                         << account.getCustomerName() << " "
-                        << account.getBalance() << "\n";
+                        << account.getBalance() << " "
+                        << account.getPin() << "\n";
             }
             outFile << nextAccountNumber << "\n";  // Save the next account number at the end
             outFile.close();
@@ -158,7 +193,7 @@ public:
         std::ifstream inFile("bank_accounts.txt");
         if (inFile.is_open()) {
             accounts.clear();
-            int accountNumber;
+            int accountNumber, pin;
             std::string name;
             double balance;
 
@@ -166,9 +201,9 @@ public:
             while (std::getline(inFile, line)) {
                 std::istringstream iss(line);
 
-                if (iss >> accountNumber >> name >> balance) {
+                if (iss >> accountNumber >> name >> balance >> pin) {
                     // This is an account entry, so add it to the accounts vector
-                    accounts.push_back(BankAccount(accountNumber, name, balance));
+                    accounts.push_back(BankAccount(accountNumber, name, balance, pin));
                 } else {
                     // This line contains the next account number
                     iss.clear();
